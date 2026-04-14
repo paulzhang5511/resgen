@@ -2,10 +2,10 @@
 name = "resgen"
 version = "0.1.0"
 edition = "2024"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Paul Zhang"]
 description = "A resource generator for Rust GUI applications (supports Android-style resource management)"
 license = "MIT"
-repository = "https://github.com/yourusername/resgen"
+repository = "https://github.com/paulzhang5511/resgen"
 readme = "README.md"
 keywords = ["resources", "generator", "android", "gui"]
 categories = ["development-tools", "gui"]
