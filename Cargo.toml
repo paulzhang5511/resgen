@@ -1,0 +1,24 @@
+[package]
+name = "resgen"
+version = "0.1.0"
+edition = "2024"
+authors = ["Your Name <your.email@example.com>"]
+description = "A resource generator for Rust GUI applications (supports Android-style resource management)"
+license = "MIT"
+repository = "https://github.com/yourusername/resgen"
+readme = "README.md"
+keywords = ["resources", "generator", "android", "gui"]
+categories = ["development-tools", "gui"]
+
+[dependencies]
+once_cell = "1.18"
+roxmltree = "0.19"
+walkdir = "2.4"
+regex = "1.10"
+quote = "1.0"
+proc-macro2 = "1.0"
+log = "0.4"
+
+[dev-dependencies]
+env_logger = "0.10"
+tempfile = "3.8"

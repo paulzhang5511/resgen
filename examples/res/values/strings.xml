@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ResGen Example</string>
+    <string name="welcome">Hello, %s!</string>
+    <string name="description">This is an example of using resgen in a Rust application.</string>
+</resources>
