@@ -10,6 +10,15 @@ readme = "README.md"
 keywords = ["resources", "generator", "android", "gui"]
 categories = ["development-tools", "gui"]
 
+[package.metadata.docs.rs]
+targets = [
+    "x86_64-unknown-linux-gnu", # Linux
+    "x86_64-apple-darwin",      # macOS Intel
+    "aarch64-apple-darwin",     # macOS Apple Silicon (M1/M2/M3)
+    "x86_64-pc-windows-msvc",   # Windows x64
+]
+default-target = "x86_64-pc-windows-msvc"
+
 [dependencies]
 once_cell = "1.18"
 roxmltree = "0.19"

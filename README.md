@@ -1,3 +1,6 @@
+[![Crates.io](https://img.shields.io/crates/v/rengen.svg)](https://crates.io/crates/resgen)
+[![Documentation](https://docs.rs/rengen/badge.svg)](https://docs.rs/resgen/latest/resgen)
+
 # resgen
 
 一个用于 Rust GUI 应用的资源生成器，支持 Android 风格的资源管理。
