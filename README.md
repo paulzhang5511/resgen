@@ -1,5 +1,5 @@
-[![Crates.io](https://img.shields.io/crates/v/rengen.svg)](https://crates.io/crates/resgen)
-[![Documentation](https://docs.rs/rengen/badge.svg)](https://docs.rs/resgen/latest/resgen)
+[![Crates.io](https://img.shields.io/crates/v/resgen.svg)](https://crates.io/crates/resgen)
+[![Documentation](https://docs.rs/resgen/badge.svg)](https://docs.rs/resgen/latest/resgen)
 
 # resgen
 
