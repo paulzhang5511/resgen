@@ -1,0 +1,10 @@
+[package]
+name = "basic_project"
+version = "0.1.0"
+edition = "2024"
+
+[build-dependencies]
+resgen = { path = "../.." }
+
+[dependencies]
+iced = "0.13"

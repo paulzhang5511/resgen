@@ -12,7 +12,9 @@ use log::{debug, info};
 pub fn gen_dimens(items: &[(String, f32)]) -> String {
     debug!("Generating dimen code for {} items", items.len());
     let mut code = String::new();
-    code.push_str("#[allow(non_upper_case_globals, dead_code)]\n");
+    if !items.is_empty() {
+        code.push_str("#[allow(non_upper_case_globals, dead_code)]\n");
+    }
     for (name, val) in items {
         code.push_str(&format!(
             "pub const {}: f32 = {:.2};\n",
@@ -42,6 +44,6 @@ mod tests {
     fn test_gen_dimens_empty() {
         let items: Vec<(String, f32)> = vec![];
         let code = gen_dimens(&items);
-        assert!(code.contains("#[allow(non_upper_case_globals, dead_code)]"));
+        assert!(code.is_empty());
     }
 }

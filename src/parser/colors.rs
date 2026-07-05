@@ -14,40 +14,43 @@ use crate::parser::utils::parse_hex_color;
 /// - `is_night`: 是否解析深色模式颜色
 /// 
 /// # 返回
-/// 颜色名 -> 颜色值的映射
-pub fn parse_colors(res_dir: &Path, is_night: bool) -> HashMap<String, String> {
+/// 成功返回颜色名 -> 颜色值的映射，失败返回错误。
+/// 文件不存在时返回空映射（不算错误），XML 解析失败则返回错误。
+pub fn parse_colors(res_dir: &Path, is_night: bool) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
     let sub_dir = if is_night { "values-night" } else { "values" };
     let path = res_dir.join(sub_dir).join("colors.xml");
     let mut map = HashMap::new();
 
     debug!("Starting to parse colors from: {}", path.display());
 
-    if let Ok(content) = fs::read_to_string(&path) {
-        if let Ok(doc) = roxmltree::Document::parse(&content) {
-            for node in doc.descendants().filter(|n| n.has_tag_name("color")) {
-                if let Some(name) = node.attribute("name") {
-                    let hex = node.text().unwrap_or("#000000").trim();
-                    if let Some((r, g, b, a)) = parse_hex_color(hex) {
-                        let color_str = format!(
-                            "Color {{ r: {:.3}, g: {:.3}, b: {:.3}, a: {:.3} }}",
-                            r, g, b, a
-                        );
-                        debug!("Parsed color '{}': {}", name, color_str);
-                        map.insert(name.to_string(), color_str);
-                    } else {
-                        warn!("Failed to parse color '{}' with value '{}'", name, hex);
-                    }
-                }
-            }
-        } else {
-            warn!("Failed to parse colors.xml at: {}", path.display());
-        }
-    } else {
+    if !path.exists() {
         info!("colors.xml not found at: {}", path.display());
+        return Ok(map);
+    }
+
+    let content = fs::read_to_string(&path)?;
+    let doc = roxmltree::Document::parse(&content).map_err(|e| {
+        format!("Failed to parse colors.xml at {}: {}", path.display(), e)
+    })?;
+
+    for node in doc.descendants().filter(|n| n.has_tag_name("color")) {
+        if let Some(name) = node.attribute("name") {
+            let hex = node.text().unwrap_or("#000000").trim();
+            if let Some((r, g, b, a)) = parse_hex_color(hex) {
+                let color_str = format!(
+                    "Color {{ r: {:.3}, g: {:.3}, b: {:.3}, a: {:.3} }}",
+                    r, g, b, a
+                );
+                debug!("Parsed color '{}': {}", name, color_str);
+                map.insert(name.to_string(), color_str);
+            } else {
+                warn!("Failed to parse color '{}' with value '{}'", name, hex);
+            }
+        }
     }
 
     info!("Successfully parsed {} colors", map.len());
-    map
+    Ok(map)
 }
 
 #[cfg(test)]
@@ -70,7 +73,7 @@ mod tests {
     <color name="text">#333333</color>
 </resources>"#).unwrap();
 
-        let colors = parse_colors(temp_dir.path(), false);
+        let colors = parse_colors(temp_dir.path(), false).unwrap();
         assert_eq!(colors.len(), 4);
         assert!(colors.contains_key("primary"));
         assert!(colors.contains_key("secondary"));
@@ -81,7 +84,19 @@ mod tests {
     #[test]
     fn test_parse_colors_nonexistent_file() {
         let temp_dir = tempdir().unwrap();
-        let colors = parse_colors(temp_dir.path(), false);
+        let colors = parse_colors(temp_dir.path(), false).unwrap();
         assert!(colors.is_empty());
+    }
+
+    #[test]
+    fn test_parse_colors_invalid_xml() {
+        let temp_dir = tempdir().unwrap();
+        let values_dir = temp_dir.path().join("values");
+        fs::create_dir(&values_dir).unwrap();
+        let colors_xml = values_dir.join("colors.xml");
+        fs::write(&colors_xml, "this is not valid xml <><>").unwrap();
+
+        let result = parse_colors(temp_dir.path(), false);
+        assert!(result.is_err());
     }
 }

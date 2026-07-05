@@ -17,6 +17,41 @@ pub use generator::{
     gen_strings, gen_colors, gen_dimens, gen_drawables, gen_r_entry,
 };
 
+/// Rust 保留关键字列表，不能用作标识符
+const RUST_KEYWORDS: &[&str] = &[
+    "as", "break", "const", "continue", "crate", "else", "enum", "extern",
+    "false", "fn", "for", "if", "impl", "in", "let", "loop", "match",
+    "mod", "move", "mut", "pub", "ref", "return", "self", "Self", "static",
+    "struct", "super", "trait", "true", "type", "unsafe", "use", "where",
+    "while", "async", "await", "dyn",
+];
+
+/// 验证名称是否为有效的 Rust 标识符
+fn validate_rust_ident(name: &str, resource_type: &str) -> Result<(), Box<dyn std::error::Error>> {
+    if name.is_empty() {
+        return Err(format!("{} resource has an empty name", resource_type).into());
+    }
+    if RUST_KEYWORDS.contains(&name) {
+        return Err(format!(
+            "{} resource name '{}' is a Rust keyword and cannot be used as an identifier",
+            resource_type, name
+        ).into());
+    }
+    if !name.chars().next().map(|c| c.is_alphabetic() || c == '_').unwrap_or(false) {
+        return Err(format!(
+            "{} resource name '{}' must start with a letter or underscore",
+            resource_type, name
+        ).into());
+    }
+    if !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        return Err(format!(
+            "{} resource name '{}' contains invalid characters (only alphanumeric and underscore allowed)",
+            resource_type, name
+        ).into());
+    }
+    Ok(())
+}
+
 /// 主配置结构体，用于配置资源生成过程
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -24,19 +59,22 @@ pub struct Config {
     res_dir: PathBuf,
     /// 输出目录路径
     out_dir: PathBuf,
+    /// Cargo manifest 目录路径
+    manifest_dir: PathBuf,
 }
 
 impl Config {
     /// 创建一个新的 Config 实例
     ///
     /// 默认使用 CARGO_MANIFEST_DIR 下的 res 目录作为资源目录，
-    /// 使用 OUT_DIR 作为输出目录
+    /// 使用 CARGO_MANIFEST_DIR 下的 src/generated 目录作为输出目录
     pub fn new() -> Self {
         debug!("Creating new Config instance");
-        let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
         Self {
-            res_dir: Path::new(&manifest_dir).join("res"),
-            out_dir: PathBuf::from(env::var("OUT_DIR").unwrap()),
+            res_dir: manifest_dir.join("res"),
+            out_dir: manifest_dir.join("src").join("generated"),
+            manifest_dir,
         }
     }
 
@@ -53,6 +91,19 @@ impl Config {
         self
     }
 
+    /// 设置输出目录
+    ///
+    /// # 参数
+    /// - `path`: 输出目录的路径
+    ///
+    /// # 返回
+    /// 返回 Config 实例本身以支持链式调用
+    pub fn out_dir<P: AsRef<Path>>(mut self, path: P) -> Self {
+        debug!("Setting output directory to: {}", path.as_ref().display());
+        self.out_dir = path.as_ref().to_path_buf();
+        self
+    }
+
     /// 执行资源生成逻辑
     ///
     /// # 返回
@@ -62,6 +113,9 @@ impl Config {
         debug!("Resource directory: {}", self.res_dir.display());
         debug!("Output directory: {}", self.out_dir.display());
 
+        // 确保输出目录存在
+        std::fs::create_dir_all(&self.out_dir)?;
+
         let out_path = &self.out_dir;
 
         println!("cargo:rerun-if-changed={}", self.res_dir.display());
@@ -69,15 +123,32 @@ impl Config {
         info!("Parsing strings resources...");
         let strings = parser::parse_strings(&self.res_dir)?;
 
+        // Validate all resource keys as valid Rust identifiers
+        for key in &strings.keys {
+            validate_rust_ident(key, "String")?;
+        }
+
         info!("Parsing dimens resources...");
-        let dimens = parser::parse_dimens(&self.res_dir);
+        let dimens = parser::parse_dimens(&self.res_dir)?;
+
+        for (name, _) in &dimens {
+            validate_rust_ident(name, "Dimen")?;
+        }
 
         info!("Parsing drawables resources...");
-        let drawables = parser::parse_drawables(&self.res_dir);
+        let drawables = parser::parse_drawables(&self.res_dir, &self.manifest_dir)?;
+
+        for (name, _, _) in &drawables {
+            validate_rust_ident(name, "Drawable")?;
+        }
 
         info!("Parsing colors resources...");
-        let light_colors = parser::parse_colors(&self.res_dir, false);
-        let dark_colors = parser::parse_colors(&self.res_dir, true);
+        let light_colors = parser::parse_colors(&self.res_dir, false)?;
+        let dark_colors = parser::parse_colors(&self.res_dir, true)?;
+
+        for key in light_colors.keys().chain(dark_colors.keys()) {
+            validate_rust_ident(key, "Color")?;
+        }
 
         let mut color_keys: Vec<String> = light_colors.keys().cloned().collect();
         for k in dark_colors.keys() {
@@ -122,14 +193,16 @@ mod tests {
         // Just test that Config can be instantiated with custom paths
         let res_dir = PathBuf::from("/tmp/res");
         let out_dir = PathBuf::from("/tmp/out");
-        
+        let manifest_dir = PathBuf::from("/tmp");
+
         // We can't test Config::new() directly without CARGO_MANIFEST_DIR and OUT_DIR
         // But we can test that Config has the right fields
         let config = Config {
             res_dir,
             out_dir,
+            manifest_dir,
         };
-        assert_eq!(format!("{:?}", config).contains("/tmp/res"), true);
-        assert_eq!(format!("{:?}", config).contains("/tmp/out"), true);
+        assert!(format!("{:?}", config).contains("/tmp/res"));
+        assert!(format!("{:?}", config).contains("/tmp/out"));
     }
 }

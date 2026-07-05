@@ -15,7 +15,7 @@
 
 ## 生成的文件
 
-构建后，resgen 会在 `OUT_DIR`（由 Cargo 自动设置）中生成以下文件：
+构建后，resgen 会在 `src/generated/` 目录中生成以下文件：
 
 | 文件名 | 说明 |
 |--------|------|
@@ -24,6 +24,8 @@
 | `dimens_generated.rs` | 尺寸资源代码（常量定义） |
 | `drawable_generated.rs` | 可绘制资源代码（带 OnceLock 缓存的图片/ SVG 加载函数） |
 | `r_generated.rs` | 总入口文件（整合了所有资源，提供 R 模块） |
+
+> **提示**：建议将 `src/generated/` 添加到 `.gitignore`，因为这些文件是自动生成的。
 
 ## 使用方法
 
@@ -58,7 +60,7 @@ fn main() {
 
 ```rust
 // 包含总入口文件
-include!(concat!(env!("OUT_DIR"), "/r_generated.rs"));
+include!("generated/r_generated.rs");
 
 // 引入 R 模块以便于使用
 use R::*;
@@ -114,7 +116,13 @@ your_project/
 ├── Cargo.toml
 ├── build.rs
 ├── src/
-│   └── main.rs
+│   ├── main.rs
+│   └── generated/          # 自动生成（建议加入 .gitignore）
+│       ├── r_generated.rs
+│       ├── strings_generated.rs
+│       ├── colors_generated.rs
+│       ├── dimens_generated.rs
+│       └── drawable_generated.rs
 └── res/
     ├── values/
     │   ├── strings.xml      # 默认语言的字符串资源

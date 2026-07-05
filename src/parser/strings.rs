@@ -7,6 +7,38 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
+/// 将 Android 格式说明符转换为 Rust 格式字符串
+///
+/// 支持的转换：
+/// - `%s` → `{}`（字符串）
+/// - `%d` → `{}`（整数）
+/// - `%f` → `{}`（浮点数）
+/// - `%1$s`, `%2$d` → `{0}`, `{1}`（位置参数，从1开始）
+fn convert_android_format(s: &str) -> String {
+    let re = Regex::new(r"%(\d+)\$([sdf])|%([sdf])").unwrap();
+    let mut result = s.to_string();
+    let mut offset = 0i32;
+
+    for cap in re.captures_iter(s) {
+        let full = cap.get(0).unwrap();
+        let start = (full.start() as i32 + offset) as usize;
+        let end = (full.end() as i32 + offset) as usize;
+
+        let replacement = if let Some(index) = cap.get(1) {
+            // Positional: %N$X → {N-1}
+            format!("{{{}}}", index.as_str().parse::<usize>().unwrap().saturating_sub(1))
+        } else {
+            // Simple: %X → {}
+            "{}".to_string()
+        };
+
+        offset += replacement.len() as i32 - (end - start) as i32;
+        result.replace_range(start..end, &replacement);
+    }
+
+    result
+}
+
 /// 字符串资源中间结构
 #[derive(Debug, PartialEq)]
 pub struct ParsedStrings {
@@ -29,7 +61,6 @@ pub fn parse_strings(res_dir: &Path) -> Result<ParsedStrings, Box<dyn std::error
     debug!("Starting to parse strings from: {}", res_dir.display());
     let mut string_data: HashMap<String, HashMap<String, String>> = HashMap::new();
     let mut all_locales: HashSet<String> = HashSet::new();
-    let re_format = Regex::new(r"%s")?;
 
     for entry in WalkDir::new(res_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
@@ -59,13 +90,13 @@ pub fn parse_strings(res_dir: &Path) -> Result<ParsedStrings, Box<dyn std::error
             for node in doc.descendants().filter(|n| n.has_tag_name("string")) {
                 if let Some(name) = node.attribute("name") {
                     let mut val = node.text().unwrap_or("").to_string();
-                    val = re_format.replace_all(&val, "{}").to_string();
+                    val = convert_android_format(&val);
                     val = val.replace("\\'", "'").replace("\\n", "\n");
 
                     debug!("Parsed string '{}' for locale '{}': {:?}", name, locale, val);
                     string_data
                         .entry(name.to_string())
-                        .or_insert_with(HashMap::new)
+                        .or_default()
                         .insert(locale.clone(), val);
                 }
             }
@@ -127,5 +158,19 @@ mod tests {
         assert_eq!(parsed.data.get("test1").unwrap().get("default").unwrap(), "Hello, world");
         assert_eq!(parsed.data.get("test2").unwrap().get("default").unwrap(), "Line 1\nLine 2");
         assert_eq!(parsed.data.get("test3").unwrap().get("default").unwrap(), "It's a test");
+    }
+
+    #[test]
+    fn test_convert_android_format() {
+        // Simple format specifiers
+        assert_eq!(convert_android_format("Hello %s"), "Hello {}");
+        assert_eq!(convert_android_format("Count: %d"), "Count: {}");
+        assert_eq!(convert_android_format("Value: %f"), "Value: {}");
+        // Positional format specifiers
+        assert_eq!(convert_android_format("Hello %1$s, you have %2$d items"), "Hello {0}, you have {1} items");
+        // Mixed
+        assert_eq!(convert_android_format("%s has %d items"), "{} has {} items");
+        // No format specifiers
+        assert_eq!(convert_android_format("Plain text"), "Plain text");
     }
 }

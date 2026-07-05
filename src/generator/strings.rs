@@ -33,33 +33,50 @@ pub fn gen_strings(
 
     code.push_str("/// 根据语言环境返回静态字符串引用 (零拷贝)\n");
     code.push_str("pub fn get_raw_string(id: StringId, locale: &str) -> &'static str {\n");
-    code.push_str("    match locale {\n");
 
-    for locale in locales {
-        code.push_str(&format!("        {:?} => match id {{\n", locale));
+    if locales.is_empty() {
+        // 只有 default locale，直接 match id
+        code.push_str("    let _ = locale;\n");
+        code.push_str("    match id {\n");
         for key in keys {
-            let map = data.get(key).unwrap();
-            let val = map
-                .get(locale)
-                .or_else(|| map.get("default"))
+            let val = data
+                .get(key)
+                .unwrap()
+                .get("default")
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            code.push_str(&format!("        StringId::{} => {:?},\n", key, val));
+        }
+        code.push_str("    }\n");
+    } else {
+        code.push_str("    match locale {\n");
+        for locale in locales {
+            code.push_str(&format!("        {:?} => match id {{\n", locale));
+            for key in keys {
+                let map = data.get(key).unwrap();
+                let val = map
+                    .get(locale)
+                    .or_else(|| map.get("default"))
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
+                code.push_str(&format!("            StringId::{} => {:?},\n", key, val));
+            }
+            code.push_str("        },\n");
+        }
+        code.push_str("        _ => match id {\n");
+        for key in keys {
+            let val = data
+                .get(key)
+                .unwrap()
+                .get("default")
                 .map(|s| s.as_str())
                 .unwrap_or("");
             code.push_str(&format!("            StringId::{} => {:?},\n", key, val));
         }
-        code.push_str("        },\n");
+        code.push_str("        }\n    }\n");
     }
 
-    code.push_str("        _ => match id {\n");
-    for key in keys {
-        let val = data
-            .get(key)
-            .unwrap()
-            .get("default")
-            .map(|s| s.as_str())
-            .unwrap_or("");
-        code.push_str(&format!("            StringId::{} => {:?},\n", key, val));
-    }
-    code.push_str("        }\n    }\n}\n");
+    code.push_str("}\n");
 
     info!("Successfully generated string code");
     code
